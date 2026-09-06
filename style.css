@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #262626;
+  font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+  color: #eee;
+}
+
+#game-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+h1 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+h1 .sub {
+  font-size: 13px;
+  font-weight: normal;
+  color: #999;
+  margin-left: 10px;
+}
+
+#hud {
+  width: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#stage-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #ffd54a;
+}
+
+#stage-select button,
+#restart-btn {
+  background: #3a3a3a;
+  border: 1px solid #555;
+  color: #eee;
+  padding: 6px 10px;
+  margin-left: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#stage-select button:hover,
+#restart-btn:hover {
+  background: #4a4a4a;
+  border-color: #ffd54a;
+}
+
+#canvas-wrap {
+  position: relative;
+  border: 2px solid #f2f2f2;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  background: #4a4a4a;
+  cursor: none;
+}
+
+#win-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#win-overlay.hidden {
+  display: none;
+}
+
+.win-box {
+  background: #1e1e1e;
+  border: 2px solid #ffd54a;
+  border-radius: 8px;
+  padding: 24px 36px;
+  text-align: center;
+}
+
+#win-text {
+  font-size: 20px;
+  color: #ffd54a;
+  margin-bottom: 14px;
+  font-weight: bold;
+}
+
+#next-btn {
+  background: #ffd54a;
+  color: #222;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#next-btn:hover {
+  background: #ffe083;
+}
+
+#instructions {
+  width: 800px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ddd;
+}
+
+#instructions .controls {
+  color: #999;
+  font-size: 12px;
+}
+
+#legend {
+  width: 800px;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #ccc;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.dot.player { background: #4fc3f7; border-radius: 2px; }
+.dot.box { background: #a1662f; }
+.dot.ball { background: #ff9800; border-radius: 50%; }
+.dot.sensor-off { background: #e53935; border-radius: 50%; }
+.dot.sensor-on { background: #43a047; border-radius: 50%; }
