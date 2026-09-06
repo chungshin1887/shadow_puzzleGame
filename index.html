@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shadow Lab - 빛과 그림자 퍼즐</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-wrap">
+    <h1>💡 Shadow Lab <span class="sub">빛과 그림자의 퍼즐</span></h1>
+
+    <div id="hud">
+      <div id="stage-name">Stage 1</div>
+      <div id="stage-select">
+        <button data-stage="0">1</button>
+        <button data-stage="1">2</button>
+        <button data-stage="2">3</button>
+        <button data-stage="3">4</button>
+        <button data-stage="4">5</button>
+      </div>
+      <button id="restart-btn">↺ 다시하기</button>
+    </div>
+
+    <div id="canvas-wrap">
+      <canvas id="game" width="800" height="500"></canvas>
+      <div id="win-overlay" class="hidden">
+        <div class="win-box">
+          <div id="win-text">문이 열렸습니다!</div>
+          <button id="next-btn">다음 스테이지 →</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="instructions">
+      <p id="instr-text">마우스를 움직여 빛의 위치를 조절하세요.</p>
+      <p class="controls">
+        <b>WASD</b> 이동 &nbsp;|&nbsp; <b>마우스</b> 빛 이동 &nbsp;|&nbsp; <b>R</b> 조명 켜기/끄기
+      </p>
+    </div>
+
+    <div id="legend">
+      <span><i class="dot player"></i> 플레이어</span>
+      <span><i class="dot box"></i> 상자</span>
+      <span><i class="dot ball"></i> 공</span>
+      <span><i class="dot sensor-off"></i> 센서(꺼짐)</span>
+      <span><i class="dot sensor-on"></i> 센서(켜짐)</span>
+    </div>
+  </div>
+
+<script src="game.js"></script>
+</body>
+</html>
