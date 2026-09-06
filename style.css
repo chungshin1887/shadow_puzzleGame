@@ -48,7 +48,8 @@ h1 .sub {
 }
 
 #stage-select button,
-#restart-btn {
+#restart-btn,
+#help-btn {
   background: #3a3a3a;
   border: 1px solid #555;
   color: #eee;
@@ -60,9 +61,14 @@ h1 .sub {
 }
 
 #stage-select button:hover,
-#restart-btn:hover {
+#restart-btn:hover,
+#help-btn:hover {
   background: #4a4a4a;
   border-color: #ffd54a;
+}
+
+#hud-right {
+  display: flex;
 }
 
 #canvas-wrap {
@@ -75,28 +81,74 @@ h1 .sub {
 canvas {
   display: block;
   background: #4a4a4a;
-  cursor: none;
 }
 
-#win-overlay {
+.overlay-panel {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-#win-overlay.hidden {
+.overlay-panel.hidden {
   display: none;
 }
 
-.win-box {
+.panel-box {
   background: #1e1e1e;
   border: 2px solid #ffd54a;
   border-radius: 8px;
-  padding: 24px 36px;
+  padding: 22px 30px;
+  text-align: left;
+  max-width: 480px;
+}
+
+#start-title {
+  font-size: 19px;
+  font-weight: bold;
+  color: #ffd54a;
+  margin-bottom: 8px;
   text-align: center;
+}
+
+#start-goal {
+  font-size: 14px;
+  color: #f0f0f0;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: #2b2b2b;
+  border-radius: 6px;
+  border-left: 3px solid #ffd54a;
+}
+
+#start-controls {
+  margin: 0 0 16px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.7;
+}
+
+#start-btn,
+#next-btn {
+  display: block;
+  margin: 0 auto;
+  background: #ffd54a;
+  color: #222;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#start-btn:hover,
+#next-btn:hover {
+  background: #ffe083;
 }
 
 #win-text {
@@ -104,21 +156,7 @@ canvas {
   color: #ffd54a;
   margin-bottom: 14px;
   font-weight: bold;
-}
-
-#next-btn {
-  background: #ffd54a;
-  color: #222;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 4px;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-#next-btn:hover {
-  background: #ffe083;
+  text-align: center;
 }
 
 #instructions {
@@ -126,11 +164,7 @@ canvas {
   margin-top: 10px;
   font-size: 14px;
   color: #ddd;
-}
-
-#instructions .controls {
-  color: #999;
-  font-size: 12px;
+  min-height: 20px;
 }
 
 #legend {
@@ -155,5 +189,6 @@ canvas {
 .dot.player { background: #4fc3f7; border-radius: 2px; }
 .dot.box { background: #a1662f; }
 .dot.ball { background: #ff9800; border-radius: 50%; }
+.dot.lamp { background: #ffd54a; border-radius: 50%; }
 .dot.sensor-off { background: #e53935; border-radius: 50%; }
 .dot.sensor-on { background: #43a047; border-radius: 50%; }
