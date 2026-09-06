@@ -1,18 +1,23 @@
 /* ============================================================
-   Shadow Lab - 빛과 그림자 퍼즐 게임
-   핵심 아이디어: 물체를 옮기는 게 아니라 "그림자"를 이용해 퍼즐을 푼다.
+   Shadow Lab - 빛과 그림자 퍼즐 게임 (v2)
+
+   핵심 규칙:
+   - 물체(상자/공)는 밀어서 원하는 자리에 "고정"시켜 놓는다.
+   - 조명은 위치가 고정되어 있고, 그 자리에서 "방향"만 회전할 수 있다.
+     -> 조명 아이콘을 마우스로 클릭한 채 드래그해야만 회전한다.
+        (그냥 마우스를 화면 위에 올려두는 것만으로는 아무 변화 없음)
+   - 퍼즐 순서: 먼저 물체를 배치하고, 그다음 조명 각도로 그림자를 완성한다.
    ============================================================ */
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
+const DEG = Math.PI / 180;
 
 // ---------------------------------------------------------
-// 기하 연산 유틸 (그림자 투영의 핵심)
+// 기하 연산 유틸
 // ---------------------------------------------------------
-
-// 볼록 껍질(convex hull) - monotone chain 알고리즘
 function convexHull(points) {
   const pts = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
   if (pts.length < 3) return pts;
@@ -20,17 +25,13 @@ function convexHull(points) {
 
   const lower = [];
   for (const p of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
     lower.push(p);
   }
   const upper = [];
   for (let i = pts.length - 1; i >= 0; i--) {
     const p = pts[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
     upper.push(p);
   }
   upper.pop();
@@ -38,21 +39,17 @@ function convexHull(points) {
   return lower.concat(upper);
 }
 
-// 점 p가 다각형 poly 내부에 있는지 (ray casting)
 function pointInPoly(p, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const xi = poly[i].x, yi = poly[i].y;
     const xj = poly[j].x, yj = poly[j].y;
-    const intersect =
-      yi > p.y !== yj > p.y &&
-      p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi;
+    const intersect = yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
 }
 
-// 빛 위치에서 점 p를 지나 멀리 투영
 function projectFar(light, p, dist) {
   const dx = p.x - light.x;
   const dy = p.y - light.y;
@@ -60,7 +57,6 @@ function projectFar(light, p, dist) {
   return { x: p.x + (dx / len) * dist, y: p.y + (dy / len) * dist };
 }
 
-// 물체(obstacle)의 외곽 점들을 반환 (사각형 or 원)
 function getObstaclePoints(obs) {
   if (obs.type === 'circle') {
     const pts = [];
@@ -71,7 +67,6 @@ function getObstaclePoints(obs) {
     }
     return pts;
   }
-  // rect
   return [
     { x: obs.x, y: obs.y },
     { x: obs.x + obs.w, y: obs.y },
@@ -80,12 +75,15 @@ function getObstaclePoints(obs) {
   ];
 }
 
-// 빛과 물체로부터 그림자 다각형(볼록 껍질) 계산
-// -> 거리가 멀수록 그림자가 커지는 효과가 기하학적으로 자연스럽게 발생함
 function shadowPolygonFor(light, obs) {
   const pts = getObstaclePoints(obs);
   const far = pts.map((p) => projectFar(light, p, 3000));
   return convexHull(pts.concat(far));
+}
+
+function obstacleCenter(obs) {
+  if (obs.type === 'circle') return { x: obs.x, y: obs.y };
+  return { x: obs.x + obs.w / 2, y: obs.y + obs.h / 2 };
 }
 
 function polygonBBox(poly) {
@@ -100,9 +98,7 @@ function polygonBBox(poly) {
 }
 
 function getBBoxOf(obj) {
-  if (obj.type === 'circle') {
-    return { x: obj.x - obj.r, y: obj.y - obj.r, w: obj.r * 2, h: obj.r * 2 };
-  }
+  if (obj.type === 'circle') return { x: obj.x - obj.r, y: obj.y - obj.r, w: obj.r * 2, h: obj.r * 2 };
   return { x: obj.x, y: obj.y, w: obj.w, h: obj.h };
 }
 
@@ -114,48 +110,64 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
+function angleDiff(a, b) {
+  return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
 // ---------------------------------------------------------
 // 스테이지 정의
+// 각 lamp: pivot(고정 위치), angle(초기 각도, deg), minAngle/maxAngle(회전 제한, deg),
+//          halfAngle(빛이 퍼지는 반각, deg), locked(회전 불가 여부)
 // ---------------------------------------------------------
 const STAGES = [
   {
-    name: 'Stage 1 · 빛 움직이기',
-    instr: '마우스를 움직여 빛의 위치를 조절하세요. 고정된 상자의 그림자로 센서를 가리면 문이 열립니다.',
-    player: { x: 70, y: 230, w: 30, h: 30 },
+    name: 'Stage 1 · 조명 회전 배우기',
+    goal: '조명을 클릭한 채 드래그해서 방향을 돌리세요. 고정된 상자의 그림자로 빨간 센서를 가리면 문이 열립니다. 물체는 움직일 필요가 없습니다.',
+    player: { x: 60, y: 420, w: 28, h: 28 },
     movables: [],
-    statics: [{ type: 'rect', x: 380, y: 210, w: 70, h: 70 }],
-    sensors: [{ x: 690, y: 245, r: 22 }],
-    light: { x: 400, y: 50 },
+    statics: [{ type: 'rect', x: 360, y: 250, w: 70, h: 70 }],
+    sensors: [{ x: 630, y: 420, r: 22 }],
+    lamps: [{ id: 'L1', pivot: { x: 120, y: 40 }, angle: 120, minAngle: 20, maxAngle: 150, halfAngle: 30 }],
     target: null,
   },
   {
-    name: 'Stage 2 · 상자 밀기',
-    instr: 'WASD로 상자를 밀어 그림자 위치를 바꾸세요. 빛은 마우스로도 조절할 수 있습니다.',
-    player: { x: 70, y: 230, w: 30, h: 30 },
-    movables: [{ type: 'rect', x: 300, y: 230, w: 60, h: 60, id: 'box' }],
+    name: 'Stage 2 · 상자 밀어서 배치하기',
+    goal: '조명은 고정되어 바로 아래로만 비춥니다. WASD로 상자를 밀어 그림자가 센서 위에 오도록 정확한 자리에 배치하세요.',
+    player: { x: 60, y: 230, w: 28, h: 28 },
+    movables: [{ type: 'rect', x: 260, y: 230, w: 60, h: 60, id: 'box' }],
     statics: [],
-    sensors: [{ x: 690, y: 120, r: 22 }],
-    light: { x: 340, y: 40 },
+    sensors: [{ x: 620, y: 430, r: 22 }],
+    lamps: [{ id: 'L1', pivot: { x: 420, y: 40 }, angle: 90, minAngle: 90, maxAngle: 90, halfAngle: 34, locked: true }],
     target: null,
   },
   {
-    name: 'Stage 3 · 둥근 그림자',
-    instr: '공을 밀어 둥근 그림자를 만들고, 그림자로 센서를 가리세요.',
-    player: { x: 70, y: 400, w: 30, h: 30 },
-    movables: [{ type: 'circle', x: 250, y: 400, r: 28, id: 'ball' }],
+    name: 'Stage 3 · 밀기 + 회전 조합',
+    goal: '이번엔 상자를 밀어서 위치를 잡은 뒤, 조명 각도까지 조절해야 그림자가 센서에 닿습니다.',
+    player: { x: 60, y: 420, w: 28, h: 28 },
+    movables: [{ type: 'rect', x: 300, y: 320, w: 65, h: 65, id: 'box' }],
     statics: [],
-    sensors: [{ x: 690, y: 150, r: 26 }],
-    light: { x: 260, y: 50 },
+    sensors: [{ x: 660, y: 130, r: 24 }],
+    lamps: [{ id: 'L1', pivot: { x: 140, y: 40 }, angle: 90, minAngle: 15, maxAngle: 165, halfAngle: 30 }],
     target: null,
   },
   {
-    name: 'Stage 4 · 그림자 모양 맞추기',
-    instr: '상자를 밀고 빛의 위치를 조절해서 그림자를 점선 목표 도형에 맞추세요. (일치율 필요)',
-    player: { x: 70, y: 250, w: 30, h: 30 },
+    name: 'Stage 4 · 둥근 그림자',
+    goal: '공을 밀면 둥근 그림자가 생깁니다. 공의 위치와 조명 각도를 함께 조절해서 둥근 센서를 가리세요.',
+    player: { x: 60, y: 420, w: 28, h: 28 },
+    movables: [{ type: 'circle', x: 300, y: 400, r: 28, id: 'ball' }],
+    statics: [],
+    sensors: [{ x: 660, y: 140, r: 26 }],
+    lamps: [{ id: 'L1', pivot: { x: 380, y: 40 }, angle: 90, minAngle: 20, maxAngle: 160, halfAngle: 32 }],
+    target: null,
+  },
+  {
+    name: 'Stage 5 · 그림자 모양 맞추기',
+    goal: '상자를 밀어 위치를 잡고 조명 각도를 조절해서, 점선으로 표시된 목표 도형과 그림자 모양을 맞추세요.',
+    player: { x: 60, y: 250, w: 28, h: 28 },
     movables: [{ type: 'rect', x: 300, y: 250, w: 60, h: 60, id: 'box' }],
     statics: [],
     sensors: [],
-    light: { x: 320, y: 70 },
+    lamps: [{ id: 'L1', pivot: { x: 330, y: 40 }, angle: 90, minAngle: 20, maxAngle: 160, halfAngle: 34 }],
     target: {
       points: [
         { x: 650, y: 170 },
@@ -166,19 +178,22 @@ const STAGES = [
     },
   },
   {
-    name: 'Stage 5 · 최종 퍼즐',
-    instr: '상자와 공을 모두 이용해서 두 센서를 동시에 활성화시키세요!',
-    player: { x: 70, y: 250, w: 30, h: 30 },
+    name: 'Stage 6 · 최종 퍼즐 (조명 2개)',
+    goal: '조명이 두 개입니다. 클릭해서 원하는 조명을 선택한 뒤 드래그로 회전시키세요 (1, 2 키로도 전환 가능). 상자와 공을 각각 알맞은 자리에 밀어두고, 두 센서를 동시에 가리세요.',
+    player: { x: 60, y: 250, w: 28, h: 28 },
     movables: [
-      { type: 'rect', x: 250, y: 180, w: 55, h: 55, id: 'box' },
-      { type: 'circle', x: 250, y: 370, r: 26, id: 'ball' },
+      { type: 'rect', x: 230, y: 160, w: 55, h: 55, id: 'box' },
+      { type: 'circle', x: 230, y: 370, r: 26, id: 'ball' },
     ],
     statics: [],
     sensors: [
       { x: 690, y: 90, r: 20 },
       { x: 690, y: 410, r: 20 },
     ],
-    light: { x: 300, y: 30 },
+    lamps: [
+      { id: 'L1', pivot: { x: 300, y: 30 }, angle: 90, minAngle: 15, maxAngle: 165, halfAngle: 28 },
+      { id: 'L2', pivot: { x: 550, y: 30 }, angle: 90, minAngle: 15, maxAngle: 165, halfAngle: 28 },
+    ],
     target: null,
   },
 ];
@@ -188,11 +203,23 @@ const STAGES = [
 // ---------------------------------------------------------
 let stageIndex = 0;
 let state = null;
-let lightOn = true;
 let hasWon = false;
+let stageStarted = false;
 const keys = {};
-const mouse = { x: 400, y: 50 };
-const PLAYER_SPEED = 220; // px/sec
+const PLAYER_SPEED = 220;
+
+function createLamp(cfg) {
+  return {
+    id: cfg.id,
+    pivot: { ...cfg.pivot },
+    angle: cfg.angle * DEG,
+    minAngle: (cfg.minAngle ?? 0) * DEG,
+    maxAngle: (cfg.maxAngle ?? 180) * DEG,
+    halfAngle: (cfg.halfAngle ?? 30) * DEG,
+    locked: !!cfg.locked,
+    on: true,
+  };
+}
 
 function loadStage(idx) {
   const cfg = STAGES[idx];
@@ -201,37 +228,97 @@ function loadStage(idx) {
     movables: cfg.movables.map((m) => ({ ...m })),
     statics: cfg.statics.map((s) => ({ ...s })),
     sensors: cfg.sensors.map((s) => ({ ...s, activated: false })),
-    light: { ...cfg.light },
+    lamps: cfg.lamps.map(createLamp),
     target: cfg.target ? { points: cfg.target.points.map((p) => ({ ...p })) } : null,
   };
-  lightOn = true;
+  state.selectedLampId = state.lamps[0] ? state.lamps[0].id : null;
   hasWon = false;
-  mouse.x = cfg.light.x;
-  mouse.y = cfg.light.y;
+  stageStarted = false;
+
   document.getElementById('stage-name').textContent = cfg.name;
-  document.getElementById('instr-text').textContent = cfg.instr;
+  document.getElementById('instr-text').textContent = cfg.goal;
+  document.getElementById('start-title').textContent = cfg.name;
+  document.getElementById('start-goal').textContent = cfg.goal;
   document.getElementById('win-overlay').classList.add('hidden');
+  document.getElementById('start-overlay').classList.remove('hidden');
 }
 
 // ---------------------------------------------------------
-// 입력
+// 입력: 키보드
 // ---------------------------------------------------------
 window.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === 'r') {
-    lightOn = !lightOn;
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (!stageStarted) return;
+  if (k === 'r') {
+    const lamp = state.lamps.find((l) => l.id === state.selectedLampId);
+    if (lamp) lamp.on = !lamp.on;
   }
+  if (k === '1' && state.lamps[0]) state.selectedLampId = state.lamps[0].id;
+  if (k === '2' && state.lamps[1]) state.selectedLampId = state.lamps[1].id;
 });
 window.addEventListener('keyup', (e) => {
   keys[e.key.toLowerCase()] = false;
 });
 
-canvas.addEventListener('mousemove', (e) => {
+// ---------------------------------------------------------
+// 입력: 마우스로 조명 "드래그" 회전 (클릭한 상태에서만 동작)
+// ---------------------------------------------------------
+let draggingLampId = null;
+
+function getCanvasMouse(e) {
   const rect = canvas.getBoundingClientRect();
-  mouse.x = clamp(e.clientX - rect.left, 10, W - 10);
-  mouse.y = clamp(e.clientY - rect.top, 10, H - 10);
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function updateLampAngleTo(lamp, mx, my) {
+  let a = Math.atan2(my - lamp.pivot.y, mx - lamp.pivot.x);
+  a = clamp(a, lamp.minAngle, lamp.maxAngle);
+  lamp.angle = a;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (!stageStarted) return;
+  const m = getCanvasMouse(e);
+  for (const lamp of state.lamps) {
+    if (lamp.locked) continue;
+    const d = Math.hypot(m.x - lamp.pivot.x, m.y - lamp.pivot.y);
+    if (d <= 22) {
+      draggingLampId = lamp.id;
+      state.selectedLampId = lamp.id;
+      updateLampAngleTo(lamp, m.x, m.y);
+      break;
+    }
+  }
 });
 
+canvas.addEventListener('mousemove', (e) => {
+  const m = getCanvasMouse(e);
+  if (draggingLampId && stageStarted) {
+    const lamp = state.lamps.find((l) => l.id === draggingLampId);
+    if (lamp) updateLampAngleTo(lamp, m.x, m.y);
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  // 커서 힌트: 조명 근처에 있으면 grab 커서로 "잡을 수 있음"을 알려줌
+  if (state) {
+    let overLamp = false;
+    for (const lamp of state.lamps) {
+      if (lamp.locked) continue;
+      const d = Math.hypot(m.x - lamp.pivot.x, m.y - lamp.pivot.y);
+      if (d <= 22) { overLamp = true; break; }
+    }
+    canvas.style.cursor = overLamp ? 'grab' : 'default';
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  draggingLampId = null;
+});
+
+// ---------------------------------------------------------
+// UI 버튼
+// ---------------------------------------------------------
 document.getElementById('restart-btn').addEventListener('click', () => loadStage(stageIndex));
 document.getElementById('next-btn').addEventListener('click', () => {
   stageIndex = (stageIndex + 1) % STAGES.length;
@@ -242,6 +329,14 @@ document.querySelectorAll('#stage-select button').forEach((btn) => {
     stageIndex = parseInt(btn.dataset.stage, 10);
     loadStage(stageIndex);
   });
+});
+document.getElementById('start-btn').addEventListener('click', () => {
+  stageStarted = true;
+  document.getElementById('start-overlay').classList.add('hidden');
+});
+document.getElementById('help-btn').addEventListener('click', () => {
+  document.getElementById('start-overlay').classList.remove('hidden');
+  stageStarted = false;
 });
 
 // ---------------------------------------------------------
@@ -257,7 +352,6 @@ function updatePlayer(dt) {
   const len = Math.hypot(dx, dy) || 1;
   dx = (dx / len) * PLAYER_SPEED * dt;
   dy = (dy / len) * PLAYER_SPEED * dt;
-
   moveWithPush(dx, dy);
 }
 
@@ -267,16 +361,11 @@ function moveWithPush(dx, dy) {
   newP.x = clamp(newP.x, 0, W - newP.w);
   newP.y = clamp(newP.y, 0, H - newP.h);
 
-  // 밀 수 있는 물체와 충돌 검사
   for (const obs of state.movables) {
     const obsBox = getBBoxOf(obs);
     if (rectsOverlap(newP, obsBox)) {
       const newObsBox = { x: obsBox.x + dx, y: obsBox.y + dy, w: obsBox.w, h: obsBox.h };
-      // 캔버스 경계 체크
-      if (newObsBox.x < 0 || newObsBox.y < 0 || newObsBox.x + newObsBox.w > W || newObsBox.y + newObsBox.h > H) {
-        return; // 밀 수 없음 -> 플레이어도 멈춤
-      }
-      // 다른 물체와의 충돌 체크
+      if (newObsBox.x < 0 || newObsBox.y < 0 || newObsBox.x + newObsBox.w > W || newObsBox.y + newObsBox.h > H) return;
       for (const other of state.movables) {
         if (other === obs) continue;
         if (rectsOverlap(newObsBox, getBBoxOf(other))) return;
@@ -284,7 +373,6 @@ function moveWithPush(dx, dy) {
       for (const s of state.statics) {
         if (rectsOverlap(newObsBox, getBBoxOf(s))) return;
       }
-      // 이동 적용
       obs.x += dx;
       obs.y += dy;
     }
@@ -294,7 +382,20 @@ function moveWithPush(dx, dy) {
 }
 
 // ---------------------------------------------------------
-// 그림자 매칭 (Stage 4 실루엣 퍼즐)
+// 조명별 조명범위(cone) 안에 들어온 물체 찾기
+// ---------------------------------------------------------
+function obstaclesInLampCone(lamp, allObstacles) {
+  const list = [];
+  for (const obs of allObstacles) {
+    const c = obstacleCenter(obs);
+    const ang = Math.atan2(c.y - lamp.pivot.y, c.x - lamp.pivot.x);
+    if (Math.abs(angleDiff(ang, lamp.angle)) <= lamp.halfAngle) list.push(obs);
+  }
+  return list;
+}
+
+// ---------------------------------------------------------
+// 그림자 매칭 (Stage 5 실루엣 퍼즐)
 // ---------------------------------------------------------
 function computeShadowMatch(shadowPoly, targetPoly) {
   const bb = polygonBBox(targetPoly);
@@ -323,10 +424,12 @@ function computeShadowMatch(shadowPoly, targetPoly) {
 // ---------------------------------------------------------
 // 렌더링
 // ---------------------------------------------------------
+function playerAsObstacle() {
+  return { type: 'rect', x: state.player.x, y: state.player.y, w: state.player.w, h: state.player.h, isPlayer: true };
+}
+
 function drawScene() {
   ctx.clearRect(0, 0, W, H);
-
-  // 배경 (미니멀 회색)
   ctx.fillStyle = '#4a4a4a';
   ctx.fillRect(0, 0, W, H);
 
@@ -339,54 +442,76 @@ function drawScene() {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    state.target.points.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
+    state.target.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
 
-  // 그림자 그리기
-  let shadowPolys = [];
-  if (lightOn) {
-    for (const obs of allObstacles) {
-      const poly = shadowPolygonFor(state.light, obs);
-      shadowPolys.push({ poly, obs });
-      ctx.fillStyle = 'rgba(10,10,10,0.72)';
-      ctx.beginPath();
-      poly.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-      ctx.fill();
-    }
+  // 조명 범위(콘) 표시 + 그림자 계산
+  const shadowPolysByLamp = {};
+  const allShadowPolysFlat = [];
+
+  for (const lamp of state.lamps) {
+    if (!lamp.on) continue;
+
+    // 빛의 범위(쐐기 모양) 표시
+    const leftDir = lamp.angle - lamp.halfAngle;
+    const rightDir = lamp.angle + lamp.halfAngle;
+    const far = 2000;
+    const pL = { x: lamp.pivot.x + Math.cos(leftDir) * far, y: lamp.pivot.y + Math.sin(leftDir) * far };
+    const pR = { x: lamp.pivot.x + Math.cos(rightDir) * far, y: lamp.pivot.y + Math.sin(rightDir) * far };
+    ctx.fillStyle = 'rgba(255, 213, 74, 0.10)';
+    ctx.beginPath();
+    ctx.moveTo(lamp.pivot.x, lamp.pivot.y);
+    ctx.lineTo(pL.x, pL.y);
+    ctx.lineTo(pR.x, pR.y);
+    ctx.closePath();
+    ctx.fill();
+
+    const obsInCone = obstaclesInLampCone(lamp, allObstacles);
+    const polys = obsInCone.map((obs) => ({ poly: shadowPolygonFor(lamp.pivot, obs), obs, lampId: lamp.id }));
+    shadowPolysByLamp[lamp.id] = polys;
+    allShadowPolysFlat.push(...polys);
   }
 
-  // 센서 업데이트 + 그리기
+  // 그림자 그리기 (여러 조명 그림자가 겹치면 더 어둡게)
+  for (const s of allShadowPolysFlat) {
+    ctx.fillStyle = 'rgba(8,8,8,0.5)';
+    ctx.beginPath();
+    s.poly.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 센서 판정: 어떤 켜진 조명이든 "직접 비추면" OFF, 비추는 조명이 있는데 "가려지면" ON
   for (const sensor of state.sensors) {
-    let activated = false;
-    if (lightOn) {
-      for (const s of shadowPolys) {
-        if (pointInPoly({ x: sensor.x, y: sensor.y }, s.poly)) {
-          activated = true;
-          break;
-        }
+    let litByAny = false;
+    let shadowedByAny = false;
+    for (const lamp of state.lamps) {
+      if (!lamp.on) continue;
+      const ang = Math.atan2(sensor.y - lamp.pivot.y, sensor.x - lamp.pivot.x);
+      if (Math.abs(angleDiff(ang, lamp.angle)) > lamp.halfAngle) continue; // 이 조명의 범위 밖
+      const polysForLamp = shadowPolysByLamp[lamp.id] || [];
+      let blocked = false;
+      for (const s of polysForLamp) {
+        if (pointInPoly({ x: sensor.x, y: sensor.y }, s.poly)) { blocked = true; break; }
       }
+      if (blocked) shadowedByAny = true;
+      else litByAny = true;
     }
-    sensor.activated = activated;
+    sensor.activated = !litByAny && shadowedByAny;
+
     ctx.beginPath();
     ctx.arc(sensor.x, sensor.y, sensor.r, 0, Math.PI * 2);
-    ctx.fillStyle = activated ? '#43a047' : '#e53935';
+    ctx.fillStyle = sensor.activated ? '#43a047' : '#e53935';
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#fff';
     ctx.stroke();
   }
 
-  // 고정 물체 (statics)
+  // 고정 물체
   for (const s of state.statics) {
     ctx.fillStyle = '#7a5230';
     ctx.fillRect(s.x, s.y, s.w, s.h);
@@ -409,49 +534,49 @@ function drawScene() {
   ctx.fillStyle = '#4fc3f7';
   ctx.fillRect(state.player.x, state.player.y, state.player.w, state.player.h);
 
-  // 빛
-  if (lightOn) {
-    const grad = ctx.createRadialGradient(state.light.x, state.light.y, 0, state.light.x, state.light.y, 40);
-    grad.addColorStop(0, 'rgba(255,213,74,0.9)');
-    grad.addColorStop(1, 'rgba(255,213,74,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(state.light.x, state.light.y, 40, 0, Math.PI * 2);
-    ctx.fill();
+  // 조명 자체 (아이콘 + 방향 표시선 + 선택 표시)
+  for (const lamp of state.lamps) {
+    const selected = lamp.id === state.selectedLampId;
 
+    // 방향 표시선
+    if (lamp.on) {
+      ctx.strokeStyle = 'rgba(255,213,74,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lamp.pivot.x, lamp.pivot.y);
+      ctx.lineTo(lamp.pivot.x + Math.cos(lamp.angle) * 55, lamp.pivot.y + Math.sin(lamp.angle) * 55);
+      ctx.stroke();
+    }
+
+    // 선택 표시 링
+    if (selected && !lamp.locked) {
+      ctx.beginPath();
+      ctx.arc(lamp.pivot.x, lamp.pivot.y, 18, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // 전구 본체
     ctx.beginPath();
-    ctx.arc(state.light.x, state.light.y, 9, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffd54a';
+    ctx.arc(lamp.pivot.x, lamp.pivot.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = lamp.on ? '#ffd54a' : '#666';
     ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.arc(state.light.x, state.light.y, 9, 0, Math.PI * 2);
-    ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
+    ctx.strokeStyle = lamp.locked ? '#999' : '#222';
     ctx.stroke();
   }
 
-  // 승리 조건 체크
-  checkWinCondition(shadowPolys);
-}
-
-function playerAsObstacle() {
-  return {
-    type: 'rect',
-    x: state.player.x,
-    y: state.player.y,
-    w: state.player.w,
-    h: state.player.h,
-    isPlayer: true,
-  };
+  checkWinCondition(allShadowPolysFlat);
 }
 
 function checkWinCondition(shadowPolys) {
-  if (hasWon) return;
+  if (hasWon || !stageStarted) return;
   let won = false;
 
   if (state.target) {
-    // Stage 4: 그림자 모양 매칭 (플레이어 자신의 그림자는 매칭 대상에서 제외)
     let bestMatch = 0, bestExtra = 1;
     for (const s of shadowPolys) {
       if (s.obs.isPlayer) continue;
@@ -461,9 +586,9 @@ function checkWinCondition(shadowPolys) {
         bestExtra = extraRatio;
       }
     }
-    won = lightOn && bestMatch >= 0.78 && bestExtra <= 0.45;
+    won = bestMatch >= 0.78 && bestExtra <= 0.45;
   } else if (state.sensors.length > 0) {
-    won = lightOn && state.sensors.every((s) => s.activated);
+    won = state.sensors.every((s) => s.activated);
   }
 
   if (won) {
@@ -482,10 +607,7 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
-  state.light.x = mouse.x;
-  state.light.y = mouse.y;
-
-  if (!hasWon) updatePlayer(dt);
+  if (stageStarted && !hasWon) updatePlayer(dt);
   drawScene();
 
   requestAnimationFrame(loop);
