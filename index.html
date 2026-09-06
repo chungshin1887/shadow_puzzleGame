@@ -26,6 +26,16 @@
       </div>
     </div>
 
+    <div id="progress-panel">
+      <div class="match-label">
+        <span id="progress-label">진행률</span>
+        <span id="progress-percent">0%</span>
+      </div>
+      <div class="match-bar-bg">
+        <div id="progress-bar-fill"></div>
+      </div>
+    </div>
+
     <div id="canvas-wrap">
       <canvas id="game" width="800" height="500"></canvas>
 
@@ -35,7 +45,8 @@
           <div id="start-goal"></div>
           <ul id="start-controls">
             <li><b>WASD</b> — 캐릭터 이동 (물체에 부딪히면 밀립니다)</li>
-            <li><b>조명을 클릭한 채 드래그</b> — 조명 방향 회전</li>
+            <li><b>조명 클릭</b> — 조명 선택 (선택된 조명은 흰 점선 링으로 표시)</li>
+            <li><b>← / →</b> — 선택된 조명 방향 회전</li>
             <li><b>R</b> — 선택된 조명 켜기 / 끄기</li>
             <li><b>1, 2</b> — 조명이 여러 개일 때 선택 전환</li>
           </ul>
@@ -49,26 +60,25 @@
           <button id="next-btn">다음 스테이지 →</button>
         </div>
       </div>
+
+      <div id="complete-overlay" class="overlay-panel hidden">
+        <div class="panel-box complete-box">
+          <div id="complete-title">🎉 축하합니다!</div>
+          <div id="complete-text">모든 스테이지를 완료했습니다!</div>
+          <button id="restart-all-btn">🏠 첫 스테이지로 돌아가기</button>
+        </div>
+      </div>
     </div>
 
     <div id="instructions">
-      <p id="instr-text">조명을 클릭한 채로 드래그해서 방향을 돌려보세요.</p>
-      <div id="match-info" class="hidden">
-        <div class="match-label">
-          <span>그림자 일치율</span>
-          <span id="match-percent">0%</span>
-        </div>
-        <div class="match-bar-bg">
-          <div id="match-bar-fill"></div>
-        </div>
-      </div>
+      <p id="instr-text">조명을 클릭해서 선택한 뒤, ←/→ 방향키로 돌려보세요.</p>
     </div>
 
     <div id="legend">
       <span><i class="dot player"></i> 플레이어</span>
       <span><i class="dot box"></i> 상자 (밀 수 있음)</span>
       <span><i class="dot ball"></i> 공 (밀 수 있음)</span>
-      <span><i class="dot lamp"></i> 조명 (드래그로 회전)</span>
+      <span><i class="dot lamp"></i> 조명 (클릭 후 ←/→로 회전)</span>
       <span><i class="dot sensor-off"></i> 센서(꺼짐)</span>
       <span><i class="dot sensor-on"></i> 센서(켜짐)</span>
     </div>
