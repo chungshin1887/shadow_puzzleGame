@@ -161,19 +161,20 @@ const STAGES = [
     target: null,
   },
   {
-    name: 'Stage 5 · 그림자 모양 맞추기',
-    goal: '상자를 밀어 위치를 잡고 조명 각도를 조절해서, 점선으로 표시된 목표 도형과 그림자 모양을 맞추세요.',
+    name: 'Stage 5 · 그림자로 목표 존 채우기',
+    goal:
+      '오른쪽에 점선 네모(목표 존)가 있습니다. 상자를 좌우로 밀어서 목표 존과 비슷한 가로 위치로 옮기고, 조명을 위아래로 돌려서 그림자가 목표 존을 최대한 많이 덮도록 하세요. 아래 "일치율"이 60%를 넘으면 문이 열립니다. 그림자가 목표 존보다 더 커도 괜찮아요 — 목표 존만 다 덮으면 됩니다.',
     player: { x: 60, y: 250, w: 28, h: 28 },
-    movables: [{ type: 'rect', x: 300, y: 250, w: 60, h: 60, id: 'box' }],
+    movables: [{ type: 'rect', x: 300, y: 260, w: 60, h: 60, id: 'box' }],
     statics: [],
     sensors: [],
-    lamps: [{ id: 'L1', pivot: { x: 330, y: 40 }, angle: 90, minAngle: 20, maxAngle: 160, halfAngle: 34 }],
+    lamps: [{ id: 'L1', pivot: { x: 330, y: 40 }, angle: 90, minAngle: 20, maxAngle: 160, halfAngle: 36 }],
     target: {
       points: [
-        { x: 650, y: 170 },
-        { x: 715, y: 250 },
-        { x: 650, y: 330 },
-        { x: 585, y: 250 },
+        { x: 550, y: 190 },
+        { x: 710, y: 190 },
+        { x: 710, y: 320 },
+        { x: 550, y: 320 },
       ],
     },
   },
@@ -241,6 +242,19 @@ function loadStage(idx) {
   document.getElementById('start-goal').textContent = cfg.goal;
   document.getElementById('win-overlay').classList.add('hidden');
   document.getElementById('start-overlay').classList.remove('hidden');
+
+  const matchInfo = document.getElementById('match-info');
+  if (cfg.target) {
+    matchInfo.classList.remove('hidden');
+    document.getElementById('match-percent').textContent = '0%';
+    document.getElementById('match-bar-fill').style.width = '0%';
+  } else {
+    matchInfo.classList.add('hidden');
+  }
+
+  document.querySelectorAll('#stage-select button').forEach((btn) => {
+    btn.classList.toggle('active', parseInt(btn.dataset.stage, 10) === idx);
+  });
 }
 
 // ---------------------------------------------------------
@@ -572,21 +586,37 @@ function drawScene() {
   checkWinCondition(allShadowPolysFlat);
 }
 
+const MATCH_THRESHOLD = 0.6;
+
+function updateMatchUI(bestMatch) {
+  const info = document.getElementById('match-info');
+  if (!state.target) {
+    info.classList.add('hidden');
+    return;
+  }
+  info.classList.remove('hidden');
+  const pct = Math.round(bestMatch * 100);
+  document.getElementById('match-percent').textContent = pct + '%';
+  document.getElementById('match-bar-fill').style.width = pct + '%';
+}
+
 function checkWinCondition(shadowPolys) {
+  let bestMatch = 0;
+
+  if (state.target) {
+    for (const s of shadowPolys) {
+      if (s.obs.isPlayer) continue;
+      const { matchRatio } = computeShadowMatch(s.poly, state.target.points);
+      if (matchRatio > bestMatch) bestMatch = matchRatio;
+    }
+    updateMatchUI(bestMatch);
+  }
+
   if (hasWon || !stageStarted) return;
   let won = false;
 
   if (state.target) {
-    let bestMatch = 0, bestExtra = 1;
-    for (const s of shadowPolys) {
-      if (s.obs.isPlayer) continue;
-      const { matchRatio, extraRatio } = computeShadowMatch(s.poly, state.target.points);
-      if (matchRatio > bestMatch) {
-        bestMatch = matchRatio;
-        bestExtra = extraRatio;
-      }
-    }
-    won = bestMatch >= 0.78 && bestExtra <= 0.45;
+    won = bestMatch >= MATCH_THRESHOLD;
   } else if (state.sensors.length > 0) {
     won = state.sensors.every((s) => s.activated);
   }
