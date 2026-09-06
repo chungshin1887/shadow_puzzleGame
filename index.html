@@ -18,14 +18,33 @@
         <button data-stage="2">3</button>
         <button data-stage="3">4</button>
         <button data-stage="4">5</button>
+        <button data-stage="5">6</button>
       </div>
-      <button id="restart-btn">↺ 다시하기</button>
+      <div id="hud-right">
+        <button id="help-btn">❓ 도움말</button>
+        <button id="restart-btn">↺ 다시하기</button>
+      </div>
     </div>
 
     <div id="canvas-wrap">
       <canvas id="game" width="800" height="500"></canvas>
-      <div id="win-overlay" class="hidden">
-        <div class="win-box">
+
+      <div id="start-overlay" class="overlay-panel">
+        <div class="panel-box">
+          <div id="start-title">Stage 1</div>
+          <div id="start-goal"></div>
+          <ul id="start-controls">
+            <li><b>WASD</b> — 캐릭터 이동 (물체에 부딪히면 밀립니다)</li>
+            <li><b>조명을 클릭한 채 드래그</b> — 조명 방향 회전</li>
+            <li><b>R</b> — 선택된 조명 켜기 / 끄기</li>
+            <li><b>1, 2</b> — 조명이 여러 개일 때 선택 전환</li>
+          </ul>
+          <button id="start-btn">시작하기</button>
+        </div>
+      </div>
+
+      <div id="win-overlay" class="overlay-panel hidden">
+        <div class="panel-box">
           <div id="win-text">문이 열렸습니다!</div>
           <button id="next-btn">다음 스테이지 →</button>
         </div>
@@ -33,16 +52,14 @@
     </div>
 
     <div id="instructions">
-      <p id="instr-text">마우스를 움직여 빛의 위치를 조절하세요.</p>
-      <p class="controls">
-        <b>WASD</b> 이동 &nbsp;|&nbsp; <b>마우스</b> 빛 이동 &nbsp;|&nbsp; <b>R</b> 조명 켜기/끄기
-      </p>
+      <p id="instr-text">조명을 클릭한 채로 드래그해서 방향을 돌려보세요.</p>
     </div>
 
     <div id="legend">
       <span><i class="dot player"></i> 플레이어</span>
-      <span><i class="dot box"></i> 상자</span>
-      <span><i class="dot ball"></i> 공</span>
+      <span><i class="dot box"></i> 상자 (밀 수 있음)</span>
+      <span><i class="dot ball"></i> 공 (밀 수 있음)</span>
+      <span><i class="dot lamp"></i> 조명 (드래그로 회전)</span>
       <span><i class="dot sensor-off"></i> 센서(꺼짐)</span>
       <span><i class="dot sensor-on"></i> 센서(켜짐)</span>
     </div>
