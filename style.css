@@ -184,13 +184,9 @@ canvas {
   min-height: 20px;
 }
 
-#match-info {
-  margin-top: 8px;
-  max-width: 320px;
-}
-
-#match-info.hidden {
-  display: none;
+#progress-panel {
+  width: 800px;
+  margin-bottom: 8px;
 }
 
 .match-label {
@@ -201,7 +197,7 @@ canvas {
   margin-bottom: 4px;
 }
 
-#match-percent {
+#progress-percent {
   font-weight: bold;
   color: #ffd54a;
 }
@@ -215,11 +211,46 @@ canvas {
   border: 1px solid #555;
 }
 
-#match-bar-fill {
+#progress-bar-fill {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, #e53935, #ffd54a, #43a047);
   transition: width 0.15s ease-out;
+}
+
+.complete-box {
+  text-align: center;
+  border-color: #43a047;
+}
+
+#complete-title {
+  font-size: 26px;
+  font-weight: bold;
+  color: #ffd54a;
+  margin-bottom: 8px;
+}
+
+#complete-text {
+  font-size: 15px;
+  color: #eee;
+  margin-bottom: 18px;
+}
+
+#restart-all-btn {
+  display: block;
+  margin: 0 auto;
+  background: #43a047;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#restart-all-btn:hover {
+  background: #56c35d;
 }
 
 #legend {
